@@ -2,7 +2,6 @@ package config
 
 import "os"
 
-
 type Config struct {
 	HTTPAddress string
 	DatabaseURL string
@@ -20,10 +19,9 @@ func Load() Config {
 
 func getEnv(key, fallback string) string {
 	value := os.Getenv(key)
-	
+
 	if value == "" {
 		return fallback
 	}
 	return value
 }
-

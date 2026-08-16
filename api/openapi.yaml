@@ -1,0 +1,195 @@
+openapi: 3.0.3
+info:
+  title: Coupons Service API
+  version: 1.0.0
+servers:
+  - url: /
+paths:
+  /health/live:
+    get:
+      summary: Liveness check
+      responses:
+        "200":
+          description: Service is running
+  /health/ready:
+    get:
+      summary: Readiness check
+      responses:
+        "200":
+          description: Service and database are ready
+        "503":
+          $ref: "#/components/responses/Error"
+  /coupons:
+    post:
+      summary: Create a coupon
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCoupon"
+      responses:
+        "201":
+          description: Coupon created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /coupons/{code}:
+    parameters:
+      - $ref: "#/components/parameters/CouponCode"
+    get:
+      summary: Get a coupon
+      responses:
+        "200":
+          description: Coupon details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        "404":
+          $ref: "#/components/responses/Error"
+  /coupons/{code}/apply:
+    parameters:
+      - $ref: "#/components/parameters/CouponCode"
+    post:
+      summary: Apply a coupon to an invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplyCoupon"
+      responses:
+        "200":
+          description: Discount result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplyResult"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+  /coupons/{code}/deactivate:
+    parameters:
+      - $ref: "#/components/parameters/CouponCode"
+    post:
+      summary: Deactivate a coupon
+      responses:
+        "204":
+          description: Coupon deactivated
+        "404":
+          $ref: "#/components/responses/Error"
+components:
+  parameters:
+    CouponCode:
+      name: code
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[A-Z0-9_-]{3,64}$"
+  responses:
+    Error:
+      description: Request failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    CreateCoupon:
+      type: object
+      additionalProperties: false
+      required: [code, type, value, max_redemptions, expires_at]
+      properties:
+        code:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{3,64}$"
+        type:
+          type: string
+          enum: [percentage, fixed]
+        value:
+          type: integer
+          format: int64
+          minimum: 1
+        currency:
+          type: string
+          pattern: "^[A-Za-z]{3}$"
+          description: Required for fixed coupons and omitted for percentage coupons
+        max_redemptions:
+          type: integer
+          minimum: 1
+        expires_at:
+          type: string
+          format: date-time
+    Coupon:
+      allOf:
+        - $ref: "#/components/schemas/CreateCoupon"
+        - type: object
+          required: [id, redeemed_count, active, created_at]
+          properties:
+            id:
+              type: string
+              format: uuid
+            redeemed_count:
+              type: integer
+            active:
+              type: boolean
+            created_at:
+              type: string
+              format: date-time
+    ApplyCoupon:
+      type: object
+      additionalProperties: false
+      required: [invoice_id, amount, currency]
+      properties:
+        invoice_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Original amount in minor units
+        currency:
+          type: string
+          pattern: "^[A-Za-z]{3}$"
+    ApplyResult:
+      type: object
+      required: [invoice_id, original_amount, discount_amount, final_amount, currency]
+      properties:
+        invoice_id:
+          type: string
+        original_amount:
+          type: integer
+          format: int64
+        discount_amount:
+          type: integer
+          format: int64
+        final_amount:
+          type: integer
+          format: int64
+        currency:
+          type: string
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
